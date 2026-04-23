@@ -14,8 +14,8 @@ inline constexpr int kDatasetSize = 60000;
 inline constexpr int kBatchSize = 100;
 inline constexpr int kThreads = 10;
 
-inline constexpr double kLearningRate = 0.02;
-inline constexpr double kRegularization = 0.02;
+inline constexpr double kLearningRate = 0.01;
+inline constexpr double kRegularization = 0.1;
 
 struct Data {
   int value;
@@ -43,12 +43,14 @@ class Network {
       const std::vector<double>& desired);
 
   void backpropagation(unsigned epochs, const std::string& _training_file);
+  void test(const std::string& _test_file);
 };
 
 void init_stream(const std::string& _training_file);
 Data next_line();
 
 void backpropagation_thread(Network* network, std::vector<Matrix>& grad);
+void test_thread(Network* network, volatile int& passed);
 
 };  // namespace neural_network
 

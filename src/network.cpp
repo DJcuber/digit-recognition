@@ -56,6 +56,8 @@ void neural_network::init_stream(const std::string& _training_filename) {
   training_file = std::ifstream(training_filename);
 }
 
+neural_network::Network::Network() {}
+
 neural_network::Network::Network(const std::vector<int>& _layers)
     : layers(_layers) {
   if (this->layers.size() <= 1) {
@@ -240,5 +242,50 @@ void neural_network::backpropagation_thread(neural_network::Network* network,
     }
   }
 
+  network->threads_sem.release();
+}
+
+void neural_network::Network::test(const std::string& _test_file) {
+  neural_network::init_stream(_test_file);
+
+  constexpr int test_dataset_size = 10000;
+  volatile int passed = 0;
+
+  std::vector<std::thread> threads(test_dataset_size);
+
+  for (int i = 0; i < test_dataset_size; ++i) {
+    this->threads_sem.acquire();
+    threads[i] =
+        std::thread(neural_network::test_thread, this, std::ref(passed));
+  }
+
+  for (int i = 0; i < test_dataset_size; ++i) {
+    threads[i].join();
+  }
+
+  std::cout << "Correct: " << passed << ", Total: " << test_dataset_size
+            << ", Accuracy: "
+            << (static_cast<double>(passed) / test_dataset_size) * 100 << "%\n";
+}
+
+void neural_network::test_thread(neural_network::Network* network,
+                                 volatile int& passed) {
+  auto data = neural_network::next_line();
+
+  auto result = network->get_activations(data.image);
+
+  double maxi{result.back()[0]};
+  int ans{0};
+  for (std::size_t i = 1; i < result.back().size(); ++i) {
+    if (result.back()[i] > maxi) {
+      maxi = result.back()[i];
+      ans = i;
+    }
+  }
+
+  if (ans == data.value) {
+    std::lock_guard<std::mutex> lock(network->grad_mu);
+    passed = passed + 1;
+  }
   network->threads_sem.release();
 }
